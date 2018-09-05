@@ -85,13 +85,18 @@ export function getComponentCode(config) {
 	switch (config.component) {
 		case 'ReactiveList': {
 			allProps = {
-				componentId: 'SearchResult',
+				componentId: config.componentId,
 				size: 5,
 				pagination: true,
 				...config.componentProps,
 				react: {
 					and: Object.values(config.componentProps.react.and),
 				},
+				dataField: generateDataField(
+					'ReactiveList',
+					config.componentProps.dataField,
+					config.mappings,
+				),
 				onData: '{onData}',
 			};
 			componentStyle = { marginTop: 20 };
@@ -137,7 +142,7 @@ export function getComponentCode(config) {
 		useBooleanShorthandSyntax: false,
 	});
 
-	code = code.replace('onData="{onData}"', 'onData = {onData}');
+	code = code.replace('onData="{onData}"', 'onData={onData}');
 	code = code.replace('div', config.component);
 
 	return code;
