@@ -26,8 +26,8 @@ class PopularResults extends React.Component {
 	}
 
 	componentDidMount() {
-		const { appName } = this.props;
-		getPopularResults(appName)
+		const { appName, plan } = this.props;
+		getPopularResults(appName, plan)
 			.then((res) => {
 				this.setState({
 					popularResults: res,
@@ -50,7 +50,7 @@ class PopularResults extends React.Component {
 		return (
 			<Searches
 				tableProps={{
-					scroll: { x: 700 },
+					scroll: { x: 1000 },
 				}}
 				showViewOption={false}
 				columns={popularResultsFull(plan)}

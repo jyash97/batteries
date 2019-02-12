@@ -129,15 +129,14 @@ export default class Header extends Component {
 			showHeader = false;
 		}
 
-		return showHeader
-			? (
-<div
+		return showHeader ? (
+			<div
 				style={{
 					display: 'flex',
 					flexDirection: 'row-reverse',
 					padding: '10px 20px 0',
 				}}
->
+			>
 				{isDashboard && showProfileOption ? (
 					<Dropdown overlay={menu} trigger={['click']}>
 						<Button size="large" style={{ marginLeft: 8 }}>
@@ -164,8 +163,8 @@ export default class Header extends Component {
 					<Input type="text" ref={this.profileInput} placeholder="Search Profile Name" />
 					{modalError ? <p style={{ color: 'tomato' }}>{modalError}</p> : null}
 				</Modal>
-</div>
-) : null;
+			</div>
+		) : null;
 	}
 }
 

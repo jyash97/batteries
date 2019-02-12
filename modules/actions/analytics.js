@@ -4,6 +4,7 @@ import {
 	getGeoDistribution,
 	getSearchLatency,
 	getAnalyticsSummary,
+	getRequestDistribution,
 } from '../../components/analytics/utils';
 import { getAppPlanByName } from '../selectors';
 import { createAction } from './utils';
@@ -28,11 +29,13 @@ export function getAppAnalytics(name, plan, clickanalytics) {
 			.catch(error => dispatch(createAction(AppConstants.APP.ANALYTICS.GET_ERROR, null, error)));
 	};
 }
-export function getAppAnalyticsSummary(name) {
+export function getAppAnalyticsSummary(name, plan) {
 	return (dispatch, getState) => {
 		const appName = name || get(getState(), '$getCurrentApp.name', 'default');
+		const appPlan = plan || get(getAppPlanByName(getState()), 'plan', 'free');
+
 		dispatch(createAction(AppConstants.APP.ANALYTICS.GET_SUMMARY));
-		return getAnalyticsSummary(appName)
+		return getAnalyticsSummary(appName, appPlan)
 			.then(res => dispatch(
 					createAction(AppConstants.APP.ANALYTICS.GET_SUMMARY_SUCCESS, res, undefined, {
 						appName,
@@ -42,11 +45,12 @@ export function getAppAnalyticsSummary(name) {
 	};
 }
 
-export function getAppSearchLatency(name) {
+export function getAppSearchLatency(name, plan) {
 	return (dispatch, getState) => {
 		const appName = name || get(getState(), '$getCurrentApp.name', 'default');
+		const appPlan = plan || get(getAppPlanByName(getState()), 'plan', 'free');
 		dispatch(createAction(AppConstants.APP.ANALYTICS.GET_LATENCY));
-		return getSearchLatency(appName)
+		return getSearchLatency(appName, appPlan)
 			.then(res => dispatch(
 					createAction(AppConstants.APP.ANALYTICS.GET_LATENCY_SUCCESS, res, undefined, {
 						appName,
@@ -56,11 +60,38 @@ export function getAppSearchLatency(name) {
 	};
 }
 
-export function getAppGeoDistribution(name) {
+export function getAppRequestDistribution(name, plan, filters) {
 	return (dispatch, getState) => {
 		const appName = name || get(getState(), '$getCurrentApp.name', 'default');
+		const appPlan = plan || get(getAppPlanByName(getState()), 'plan', 'free');
+		dispatch(createAction(AppConstants.APP.ANALYTICS.GET_REQUEST_DISTRIBUTION));
+		return getRequestDistribution(appName, appPlan, filters)
+			.then(res => dispatch(
+					createAction(
+						AppConstants.APP.ANALYTICS.GET_REQUEST_DISTRIBUTION_SUCCESS,
+						res,
+						undefined,
+						{
+							appName,
+						},
+					),
+				))
+			.catch(error => dispatch(
+					createAction(
+						AppConstants.APP.ANALYTICS.GET_REQUEST_DISTRIBUTION_ERROR,
+						null,
+						error,
+					),
+				));
+	};
+}
+
+export function getAppGeoDistribution(name, plan) {
+	return (dispatch, getState) => {
+		const appName = name || get(getState(), '$getCurrentApp.name', 'default');
+		const appPlan = plan || get(getAppPlanByName(getState()), 'plan', 'free');
 		dispatch(createAction(AppConstants.APP.ANALYTICS.GET_GEO_DISTRIBUTION));
-		return getGeoDistribution(appName)
+		return getGeoDistribution(appName, appPlan)
 			.then(res => dispatch(
 					createAction(
 						AppConstants.APP.ANALYTICS.GET_GEO_DISTRIBUTION_SUCCESS,

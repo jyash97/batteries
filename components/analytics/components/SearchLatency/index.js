@@ -2,7 +2,7 @@ import React from 'react';
 import { Card } from 'antd';
 import { css } from 'react-emotion';
 import {
- BarChart, XAxis, YAxis, Bar,
+ BarChart, XAxis, YAxis, Bar, Label,
 } from 'recharts';
 import find from 'lodash/find';
 import { connect } from 'react-redux';
@@ -11,7 +11,7 @@ import get from 'lodash/get';
 import Loader from '../../../shared/Loader/Spinner';
 import EmptyData from '../../../shared/EmptyData';
 import { getAppSearchLatency } from '../../../../modules/actions';
-import { getAppSearchLatencyByName } from '../../../../modules/selectors';
+import { getAppSearchLatencyByName, getAppPlanByName } from '../../../../modules/selectors';
 
 const getSearchLatencyDummy = (latency = []) => {
 	const dummyLatency = latency.map(l => l);
@@ -32,9 +32,10 @@ const getSearchLatencyDummy = (latency = []) => {
 
 const cls = css`
 	width: 100%;
-	.recharts-label {
-		transform: translate(-50px, 15px);
-	}
+`;
+const label = css`
+	font-weight: bold;
+	font-size: 12px;
 `;
 
 class SearchLatency extends React.Component {
@@ -54,7 +55,9 @@ class SearchLatency extends React.Component {
 	}
 
 	render() {
-		const { searchLatency, isLoading, success } = this.props;
+		const {
+ searchLatency, isLoading, success, plan,
+} = this.props;
 		const { width } = this.state;
 		return (
 			<div
@@ -63,7 +66,15 @@ class SearchLatency extends React.Component {
 				}}
 				css="width: 100%"
 			>
-				<Card title="Search Latency" css={cls}>
+				<Card
+					title={(
+<span>
+							Search Latency (
+							<span css={label}>{plan === 'growth' ? 'Monthly' : 'Weekly'}</span>)
+</span>
+)}
+					css={cls}
+				>
 					{isLoading ? (
 						<Loader />
 					) : (
@@ -71,17 +82,30 @@ class SearchLatency extends React.Component {
 							<BarChart
 								margin={{
 									top: 20,
-									right: 20,
+									right: 50,
 									bottom: 20,
-									left: 70,
+									left: 20,
 								}}
 								barCategoryGap={0}
 								width={width}
 								height={400}
 								data={getSearchLatencyDummy(searchLatency)}
 							>
-								<XAxis label="Latency (in ms)" dataKey="key" />
-								<YAxis allowDecimals={false} label="Search Count" />
+								<XAxis dataKey="key">
+									<Label
+										value="Latency (in ms)"
+										offset={0}
+										position="insideBottom"
+									/>
+								</XAxis>
+								<YAxis
+									label={{
+										value: 'Search Count',
+										angle: -90,
+										position: 'insideLeft',
+									}}
+									allowDecimals={false}
+								/>
 								<Bar dataKey="count" fill="#A4C7FF" />
 							</BarChart>
 						)
@@ -94,6 +118,7 @@ class SearchLatency extends React.Component {
 SearchLatency.propTypes = {
 	fetchAppSearchLatency: PropTypes.func.isRequired,
 	searchLatency: PropTypes.array.isRequired,
+	plan: PropTypes.string.isRequired,
 	isLoading: PropTypes.bool.isRequired,
 	success: PropTypes.bool.isRequired,
 };
@@ -104,6 +129,7 @@ const mapStateToProps = (state) => {
 		isLoading: get(state, '$getAppSearchLatency.isFetching'),
 		success: get(state, '$getAppSearchLatency.success'),
 		isSearchLatencyPresent: !!searchLatency,
+		plan: get(getAppPlanByName(state), 'plan', 'free'),
 	};
 };
 const mapDispatchToProps = dispatch => ({

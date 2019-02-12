@@ -8,6 +8,7 @@ import {
 } from 'antd';
 import PropTypes from 'prop-types';
 import { getRequestLogs, requestLogs, getTimeDuration } from '../../utils';
+import { getAppPlanByName } from '../../../../modules/selectors';
 import RequestDetails from './RequestDetails';
 import Loader from '../../../shared/Loader/Spinner';
 
@@ -30,10 +31,14 @@ const filterHits = (hits = []) => {
 	const successHits = [];
 	const errorHits = [];
 	const searchHits = [];
+	const deleteHits = [];
 	hits.forEach((h) => {
 		const status = get(h, '_source.response.status');
 		if (get(h, '_source.classifier') === 'search') {
 			searchHits.push(h);
+		}
+		if (get(h, '_source.request.method', '').toLowerCase() === 'delete') {
+			deleteHits.push(h);
 		}
 		if (status >= 200 && status <= 300) {
 			successHits.push(h);
@@ -45,6 +50,7 @@ const filterHits = (hits = []) => {
 		successHits,
 		errorHits,
 		searchHits,
+		deleteHits,
 	};
 };
 
@@ -74,7 +80,7 @@ const parseData = (data = '') => {
 class RequestLogs extends React.Component {
 	constructor(props) {
 		super(props);
-		this.tabKeys = ['all', 'search', 'success', 'error'];
+		this.tabKeys = ['all', 'search', 'success', 'delete', 'error'];
 		const { tab } = this.props;
 		this.state = {
 			activeTabKey: this.tabKeys.includes(tab) ? props.tab : this.tabKeys[0],
@@ -89,8 +95,8 @@ class RequestLogs extends React.Component {
 	}
 
 	componentDidMount() {
-		const { appName } = this.props;
-		getRequestLogs(appName)
+		const { appName, plan } = this.props;
+		getRequestLogs(appName, plan)
 			.then((res) => {
 				const filteredHits = filterHits(res.hits);
 				this.setState({
@@ -100,6 +106,7 @@ class RequestLogs extends React.Component {
 					successHits: normalizeData(filteredHits.successHits),
 					errorHits: normalizeData(filteredHits.errorHits),
 					searchHits: normalizeData(filteredHits.searchHits),
+					deleteHits: normalizeData(filteredHits.deleteHits),
 				});
 				// Update the request time locally
 				setInterval(() => {
@@ -108,6 +115,7 @@ class RequestLogs extends React.Component {
 						successHits: normalizeData(filteredHits.successHits),
 						errorHits: normalizeData(filteredHits.errorHits),
 						searchHits: normalizeData(filteredHits.searchHits),
+						deleteHits: normalizeData(filteredHits.deleteHits),
 					});
 				}, 60000);
 			})
@@ -169,6 +177,7 @@ class RequestLogs extends React.Component {
 			successHits,
 			errorHits,
 			searchHits,
+			deleteHits,
 		} = this.state;
 		const { pageSize } = this.props;
 		return (
@@ -227,7 +236,22 @@ class RequestLogs extends React.Component {
 									scroll={{ x: 700 }}
 								/>
 							</TabPane>
-							<TabPane tab="ERROR" key={this.tabKeys[3]}>
+							<TabPane tab="DELETE" key={this.tabKeys[3]}>
+								<Table
+									css=".ant-table-row { cursor: pointer }"
+									rowKey={record => record.id}
+									dataSource={deleteHits}
+									columns={requestLogs}
+									pagination={{
+										pageSize,
+									}}
+									onRow={record => ({
+										onClick: () => this.handleLogClick(record),
+									})}
+									scroll={{ x: 700 }}
+								/>
+							</TabPane>
+							<TabPane tab="ERROR" key={this.tabKeys[4]}>
 								<Table
 									css=".ant-table-row { cursor: pointer }"
 									rowKey={record => record.id}
@@ -243,41 +267,34 @@ class RequestLogs extends React.Component {
 								/>
 							</TabPane>
 						</Tabs>
-						{showDetails
-							&& this.currentRequest && (
-								<RequestDetails
-									show={showDetails}
-									handleCancel={this.handleCancel}
-									headers={get(
-										this.currentRequest,
-										'_source.request.headers',
-										{},
-									)}
-									request={
-										parseData(
-											get(this.currentRequest, '_source.request.body'),
-										) || {}
-									}
-									response={
-										parseData(
-											get(this.currentRequest, '_source.response.body'),
-										) || {}
-									}
-									time={get(this.currentRequest, '_source.timestamp', '')}
-									method={get(this.currentRequest, '_source.request.method', '')}
-									url={get(this.currentRequest, '_source.request.uri', '')}
-									ip={get(
-										this.currentRequest,
-										'_source.request.headers.X-Forwarded-For[0]',
-									)}
-									status={get(this.currentRequest, '_source.response.status', '')}
-									processingTime={get(
-										this.currentRequest,
-										'_source.response.timetaken',
-										'',
-									)}
-								/>
-							)}
+						{showDetails && this.currentRequest && (
+							<RequestDetails
+								show={showDetails}
+								handleCancel={this.handleCancel}
+								headers={get(this.currentRequest, '_source.request.headers', {})}
+								request={
+									parseData(get(this.currentRequest, '_source.request.body'))
+									|| {}
+								}
+								response={
+									parseData(get(this.currentRequest, '_source.response.body'))
+									|| {}
+								}
+								time={get(this.currentRequest, '_source.timestamp', '')}
+								method={get(this.currentRequest, '_source.request.method', '')}
+								url={get(this.currentRequest, '_source.request.uri', '')}
+								ip={get(
+									this.currentRequest,
+									'_source.request.headers.X-Forwarded-For[0]',
+								)}
+								status={get(this.currentRequest, '_source.response.status', '')}
+								processingTime={get(
+									this.currentRequest,
+									'_source.response.timetaken',
+									'',
+								)}
+							/>
+						)}
 					</React.Fragment>
 				)}
 			</Card>
@@ -289,9 +306,11 @@ RequestLogs.defaultProps = {
 	onTabChange: undefined, // Use this to override the default redirect logic on tab change
 	tab: 'all',
 	pageSize: 10,
+	plan: 'free',
 };
 RequestLogs.propTypes = {
 	tab: PropTypes.string,
+	plan: PropTypes.string,
 	onTabChange: PropTypes.func,
 	appName: PropTypes.string.isRequired,
 	changeUrlOnTabChange: PropTypes.bool,
@@ -299,6 +318,7 @@ RequestLogs.propTypes = {
 };
 
 const mapStateToProps = state => ({
-		appName: get(state, '$getCurrentApp.name'),
-	});
+	appName: get(state, '$getCurrentApp.name'),
+	plan: get(getAppPlanByName(state), 'plan'),
+});
 export default connect(mapStateToProps)(RequestLogs);
