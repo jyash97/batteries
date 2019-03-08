@@ -3,7 +3,7 @@ import {
  string, object, func, bool,
 } from 'prop-types';
 import {
- Tooltip, Icon, Input, Popover, Card, Button, Modal, Dropdown, Menu, Affix
+ Tooltip, Icon, Input, Popover, Card, Button, Modal, Dropdown, Menu, Affix, message,
 } from 'antd';
 import get from 'lodash/get';
 import { connect } from 'react-redux';
@@ -19,13 +19,15 @@ import {
 	closeIndex,
 	openIndex,
 	getSettings,
-	updateSynonyms,
+	updateSynonyms as updateSynonymsData,
 	REMOVED_KEYS,
 	getTypesFromMapping,
 	getESVersion,
+	putMapping,
 } from '../../utils/mappings';
 import conversionMap from '../../utils/conversionMap';
 import mappingUsecase from '../../utils/mappingUsecase';
+import analyzerSettings from '../../utils/analyzerSettings';
 import { getRawMappingsByAppName } from '../../modules/selectors';
 import { setCurrentApp, getAppMappings as getMappings, clearMappings } from '../../modules/actions';
 
@@ -155,6 +157,8 @@ class Mappings extends Component {
 
 		if (url) {
 			getAppMappings(appName, appbaseCredentials, url);
+
+			this.initializeSynonymsData();
 		}
 	}
 
@@ -288,8 +292,8 @@ class Mappings extends Component {
 	};
 
 	fetchSynonyms = (credentials) => {
-		const { url, appName } = this.props;
-		return getSettings(appName, credentials, url).then((data) => {
+		const { appName } = this.props;
+		return getSettings(appName, credentials).then((data) => {
 			if (get(data[appName], 'settings.index')) {
 				const { index } = data[appName].settings;
 				return index.analysis && index.analysis.filter.synonyms_filter
@@ -329,16 +333,76 @@ class Mappings extends Component {
 		});
 	};
 
-	reIndex = () => {
+
+	updateField = () => {
+		const mapping = JSON.parse(JSON.stringify(this.state.mapping));
+		const { activeType } = this.state;
+		if (mapping && activeType[0] && mapping[activeType[0]] && mapping[activeType[0]].properties) {
+			const { properties } = mapping[activeType[0]];
+			const keys = Object.keys(properties);
+
+			keys.forEach((key) => {
+				if (properties[key] && properties[key].fields && properties[key].fields.english) {
+					properties[key].fields.english.search_analyzer = 'english_synonyms_analyzer';
+					properties[key].fields.english.analyzer = 'english_analyzer';
+				} else if (properties[key] && properties[key].fields) {
+					properties[key].fields.english = {
+						type: 'text',
+						index: 'true',
+						analyzer: 'english_analyzer',
+						search_analyzer: 'english_synonyms_analyzer',
+					};
+				}
+			});
+		}
+		return mapping;
+	}
+
+	getUpdatedSettings = (settings) => {
+		const { analyzer: currentAnalyzer, filter: currentFilter } = settings;
+		const { analysis: { analyzer, filter } } = analyzerSettings;
+
+		Object.keys(analyzer).forEach((key) => {
+			if (!currentAnalyzer[key]) {
+				currentAnalyzer[key] = analyzer[key];
+			}
+		});
+
+		Object.keys(filter).forEach((key) => {
+			if (!currentFilter[key]) {
+				currentFilter[key] = filter[key];
+			}
+		});
+
+		return settings;
+	}
+
+	reIndex = async () => {
 		this.setState({
 			isLoading: true,
 		});
 
 		const {
- deletedPaths, activeType, mapping, esVersion,
+ deletedPaths, activeType, esVersion,
 } = this.state;
-
 		const { appId, credentials } = this.props;
+
+		let { mapping } = this.state;
+
+		// Fetch latest settings so that we dont override settings.
+		let settings = await getSettings(appId, credentials).then((data) => {
+			return get(data[appId], 'settings.index.analysis');
+		});
+
+		settings = this.getUpdatedSettings(settings);
+
+		// We need to update english search_analyzer to synonyms_analzer.
+		// This is useful when we have the synonyms in place and change the mapping
+		// the english field have english_analyzer so we need to change it to search_analyzer.
+
+		if (get(settings, 'analyzer.english_synonyms_analyzer')) {
+			mapping = this.updateField();
+		}
 
 		const excludedFields = deletedPaths
 			.map(path => path.split('.properties.').join('.'))
@@ -347,7 +411,7 @@ class Mappings extends Component {
 				return path.substring(i);
 			});
 
-		reIndex(mapping, appId, excludedFields, activeType, esVersion, credentials)
+		reIndex(mapping, appId, excludedFields, activeType, esVersion, credentials, settings)
 			.then(() => {
 				this.setState({
 					showFeedback: true,
@@ -582,39 +646,64 @@ class Mappings extends Component {
 
 	updateSynonyms = () => {
 		const credentials = this.props.credentials || this.state.credentials;
-		const { url } = this.props;
 
 		const synonyms = this.state.synonyms.split('\n').map(pair => pair
 				.split(',')
 				.map(synonym => synonym.trim())
 				.join(','));
+		let synonymsUpdated = false;
 
-		closeIndex(this.props.appName, credentials, url)
-			.then(() => updateSynonyms(this.props.appName, credentials, url, synonyms))
+		closeIndex(this.props.appName, credentials)
+			.then(() => updateSynonymsData(this.props.appName, credentials, synonyms))
 			.then(data => data.acknowledged)
 			.then((isUpdated) => {
 				if (isUpdated) {
 					this.fetchSynonyms(credentials).then(newSynonyms => this.setState({
-							synonyms: newSynonyms,
-							showSynonymModal: false,
-						}));
+						synonyms: newSynonyms,
+						showSynonymModal: false,
+						synonymsLoading: false,
+					}));
+					synonymsUpdated = true;
 				} else {
 					this.setState({
 						showSynonymModal: false,
 						showError: true,
 						errorMessage: 'Unable to update Synonyms',
+						synonymsLoading: false,
 					});
 				}
 			})
-			.then(() => openIndex(this.props.appName, credentials, url))
-			.catch(() => {
-				openIndex(this.props.appName, credentials, url);
+			.then(() => openIndex(this.props.appName, credentials))
+			.then(() => {
+				if (synonymsUpdated) {
+					// If synonyms request is successful than update mapping via PUT request
+					const { activeType } = this.state;
+					const updatedMappings = this.updateField();
+
+					putMapping(this.props.appName, credentials, updatedMappings[activeType[0]], activeType[0]).then(({ acknowledged }) => {
+						if (acknowledged) {
+							message.success("Synonyms Updated")
+							this.setState({
+								mapping: updatedMappings,
+							});
+						}
+					});
+				}
 				this.setState({
 					showSynonymModal: false,
-					showError: true,
-					errorMessage: 'Unable to update Synonyms',
+					synonymsLoading: false,
 				});
-			});
+			})
+					.catch((e) => {
+						console.error(e)
+						openIndex(this.props.appName, credentials);
+						this.setState({
+							showSynonymModal: false,
+							showError: true,
+							errorMessage: 'Unable to update Synonyms',
+							synonymsLoading: false,
+						});
+					});
 	};
 
 	render() {
@@ -758,6 +847,7 @@ class Mappings extends Component {
 					title="Add Synonym"
 					okText={this.state.synonyms ? 'Save Synonym' : 'Add Synonym'}
 					onCancel={this.handleSynonymModal}
+					okButtonProps={{loading: this.state.synonymsLoading}}
 				>
 					<TextArea
 						name="synonyms"

@@ -44,6 +44,28 @@ export function getMappings(appName, credentials, url = getURL()) {
 	});
 }
 
+export function putMapping(appName, credentials, mappings, type, url = getURL()) {
+	return new Promise((resolve, reject) => {
+		fetch(`${url}/${appName}/_mapping/${type}`, {
+			method: 'PUT',
+			headers: {
+				...getAuthHeaders(credentials),
+				'Content-Type': 'application/json',
+			},
+			body: JSON.stringify({
+				...mappings,
+			}),
+		})
+			.then(res => res.json())
+			.then((data) => {
+				resolve(data);
+			})
+			.catch((e) => {
+				reject(e);
+			});
+	});
+}
+
 export function getSettings(appName, credentials, url = getURL()) {
 	return new Promise((resolve, reject) => {
 		fetch(`${url}/${appName}/_settings`, {
@@ -82,7 +104,7 @@ export function closeIndex(appName, credentials, url = getURL()) {
 	});
 }
 
-export function updateSynonyms(appName, credentials, url = getURL(), synonymsArray) {
+export function updateSynonyms(appName, credentials, synonymsArray, url = getURL()) {
 	return new Promise((resolve, reject) => {
 		fetch(`${url}/${appName}/_settings`, {
 			method: 'PUT',
@@ -99,9 +121,15 @@ export function updateSynonyms(appName, credentials, url = getURL(), synonymsArr
 						},
 					},
 					analyzer: {
-						search_analyzer: {
+						english_synonyms_analyzer: {
+							filter: ['lowercase', 'synonyms_filter', 'asciifolding', 'porter_stem'],
 							tokenizer: 'standard',
-							filter: ['lowercase', 'synonyms_filter'],
+							type: 'custom',
+						},
+						english_analyzer: {
+							filter: ['lowercase', 'asciifolding', 'porter_stem'],
+							tokenizer: 'standard',
+							type: 'custom',
 						},
 					},
 				},
@@ -151,10 +179,18 @@ export async function getESVersion(appName, credentials) {
 	return data.version.number;
 }
 
-export function reIndex(mappings, appId, excludeFields, type, version = '5', credentials) {
+export function reIndex(
+	mappings,
+	appId,
+	excludeFields,
+	type,
+	version = '5',
+	credentials,
+	settings,
+) {
 	const body = {
 		mappings,
-		settings: analyzerSettings,
+		settings: { analysis: settings || analyzerSettings },
 		exclude_fields: excludeFields,
 		type,
 		es_version: version,
