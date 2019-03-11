@@ -115,12 +115,14 @@ export function updateSynonyms(appName, credentials, synonymsArray, url = getURL
 			body: JSON.stringify({
 				analysis: {
 					filter: {
+						...analyzerSettings.analysis.filter,
 						synonyms_filter: {
 							type: 'synonym',
 							synonyms: synonymsArray,
 						},
 					},
 					analyzer: {
+						...analyzerSettings.analysis.analyzer,
 						english_synonyms_analyzer: {
 							filter: ['lowercase', 'synonyms_filter', 'asciifolding', 'porter_stem'],
 							tokenizer: 'standard',
