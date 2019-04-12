@@ -44,7 +44,7 @@ export function getMappings(appName, credentials, url = getURL()) {
 	});
 }
 
-export function putMapping(appName, credentials,mappings, type, url = getURL()) {
+export function putMapping(appName, credentials, mappings, type, url = getURL()) {
 	return new Promise((resolve, reject) => {
 		fetch(`${url}/${appName}/_mapping/${type}`, {
 			method: 'PUT',
@@ -65,7 +65,6 @@ export function putMapping(appName, credentials,mappings, type, url = getURL()) 
 			});
 	});
 }
-
 
 export function getSettings(appName, credentials, url = getURL()) {
 	return new Promise((resolve, reject) => {
@@ -151,7 +150,7 @@ export function updateSynonyms(appName, credentials, url = getURL(), synonymsArr
 						english_analyzer: {
 							filter: ['lowercase', 'asciifolding', 'porter_stem'],
 							tokenizer: 'standard',
-							type: 'custom'
+							type: 'custom',
 						},
 					},
 				},
@@ -378,7 +377,7 @@ function getFieldsTree(mappings = {}, prefix = null) {
 		if (mappings[key].properties) {
 			tree = {
 				...tree,
-				...getFieldsTree(mappings[key].properties, key),
+				...getFieldsTree(mappings[key].properties, `${prefix ? `${prefix}.` : ''}${key}`),
 			};
 		} else {
 			const originalFields = mappings[key].fields;
