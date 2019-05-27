@@ -320,6 +320,8 @@ class SearchSandbox extends Component {
 			showProfileOption,
 			useCategorySearch,
 			customJoyrideSteps,
+			hideWalkthroughButtons,
+			showTutorial,
 		} = this.props;
 		const {
 			mappingsType, componentProps, filterCount, profile,
@@ -362,6 +364,8 @@ class SearchSandbox extends Component {
 					<Walkthrough
 						id="SearchPreview"
 						joyrideSteps={customJoyrideSteps || joyrideSteps}
+						hideButtons={hideWalkthroughButtons}
+						showTutorial={showTutorial}
 					/>
 					{React.Children.map(this.props.children, child => (
 						<SandboxContext.Consumer>
@@ -388,14 +392,18 @@ SearchSandbox.propTypes = {
 	customJoyrideSteps: PropTypes.array,
 	customProps: PropTypes.object,
 	showCodePreview: PropTypes.bool,
+	hideWalkthroughButtons: PropTypes.bool,
 	showProfileOption: PropTypes.bool,
 	showCustomList: PropTypes.bool,
+	showTutorial: PropTypes.bool,
 };
 
 SearchSandbox.defaultProps = {
 	appId: null,
 	attribution: null,
 	showCodeSandbox: true,
+	showTutorial: false,
+	hideWalkthroughButtons: false,
 	showCodePreview: true,
 	showProfileOption: true,
 	showCustomList: true,
